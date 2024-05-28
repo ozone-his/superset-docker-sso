@@ -12,7 +12,7 @@ jobs:
     with:
       download-artifacts: false
       image-name: "superset-pro"
-      image-version: "3.1.0-1.0.0"
+      image-version: "dev"
     secrets:
       DOCKER_HUB_USERNAME: ${{ secrets.DOCKER_HUB_USERNAME }}
       DOCKER_HUB_PASSWORD: ${{ secrets.DOCKER_HUB_PASSWORD }}
