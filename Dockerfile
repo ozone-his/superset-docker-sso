@@ -1,4 +1,4 @@
-FROM amancevice/superset:3.1.0
+FROM amancevice/superset:4.0.0
 # Switching to root to install the required packages
 USER root
 
