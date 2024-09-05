@@ -4,9 +4,6 @@ from dotenv import load_dotenv
 from cachelib import RedisCache
 
 from cachelib.file import FileSystemCache
-from flask_appbuilder.security.manager import AUTH_OID
-from security import OIDCSecurityManager
-
 logger = logging.getLogger()
 
 def password_from_env(url):
@@ -99,14 +96,34 @@ class ReverseProxied(object):
 
 
 ADDITIONAL_MIDDLEWARE = [ReverseProxied, ]
-AUTH_TYPE = AUTH_OID
-OIDC_CLIENT_SECRETS = '/etc/superset/client_secret.json'
-OIDC_ID_TOKEN_COOKIE_SECURE = False
-OIDC_REQUIRE_VERIFIED_EMAIL = False
-AUTH_USER_REGISTRATION = True
-AUTH_USER_REGISTRATION_ROLE = 'Gamma'
-CUSTOM_SECURITY_MANAGER = OIDCSecurityManager
 ENABLE_PROXY_FIX = True
 
 # Enable the security manager API.
 FAB_ADD_SECURITY_API = True
+
+if os.getenv("ENABLE_OAUTH") == "true":
+    from flask_appbuilder.security.manager import AUTH_OAUTH
+    from security import CustomSecurityManager
+    AUTH_ROLES_SYNC_AT_LOGIN = True
+    AUTH_USER_REGISTRATION = True
+    AUTH_USER_REGISTRATION_ROLE = "Gamma"
+    CUSTOM_SECURITY_MANAGER = CustomSecurityManager
+    LOGOUT_REDIRECT_URL = os.environ.get("SUPERSET_URL")
+    AUTH_TYPE = AUTH_OAUTH
+    OAUTH_PROVIDERS = [
+        {
+            'name': 'keycloak',
+            'token_key': 'access_token',  # Name of the token in the response of access_token_url
+            'icon': 'fa-key',   # Icon for the provider
+            'remote_app': {
+                'client_id': os.environ.get("SUPERSET_CLIENT_ID","superset"),  # Client Id (Identify Superset application)
+                'client_secret': os.environ.get("SUPERSET_CLIENT_SECRET"),  # Secret for this Client Id (Identify Superset application)
+                'api_base_url': os.environ.get("ISSUER_URL").rstrip('/') + "/protocol/openid-connect/",
+                'client_kwargs': {
+                    'scope': 'openid profile email',
+                },
+                'logout_redirect_uri': os.environ.get("SUPERSET_URL"),
+                'server_metadata_url': os.environ.get("ISSUER_URL").rstrip('/') + '/.well-known/openid-configuration',  # URL to get metadata from
+            }
+        }
+    ]
