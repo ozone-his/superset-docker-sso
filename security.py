@@ -9,7 +9,6 @@ from flask import (
     request
 )
 
-
 class CustomAuthOAuthView(AuthOAuthView):
 
     @expose("/logout/")
