@@ -26,29 +26,6 @@ log = logging.getLogger(__name__)
 
 class CustomAuthOAuthView(AuthOAuthView):
 
-    @expose("/login/")
-    def login(self, provider="keycloak", register=None):
-        provider_obj = self.appbuilder.sm.oauth_remotes[provider]
-        base_url = os.environ.get("SUPERSET_PUBLIC_URL", request.url_root.strip('/'))
-        redirect_url = base_url + '/oauth-authorized/keycloak'
-
-        if not redirect_url:
-           redirect_url = request.url_root.strip('/') + self.appbuilder.get_url_for_login
-
-        login_base_url = provider_obj.api_base_url + "auth"
-
-        # Generate state and store in the session
-        #state = secrets.token_urlsafe(32)
-       # session['oauth_state'] = state  # Store state in the session
-
-        params = {
-            "client_id": provider_obj.client_id,
-            "redirect_uri": redirect_url,
-            "response_type": "code",
-            "scope": "openid profile email"
-        }
-        return redirect("{}?{}".format(login_base_url, urlencode(params)))
-
     @expose("/logout/")
     def logout(self, provider="keycloak", register=None):
         user_id = str(g.user.id)
