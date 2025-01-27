@@ -1,29 +1,71 @@
-from math import log
 from superset.security import SupersetSecurityManager
 import logging
 from flask_appbuilder.security.views import AuthOAuthView
 from flask_appbuilder.baseviews import expose
+import os
+from six.moves.urllib.parse import urlencode
+import redis
 import time
+import secrets
+from flask_login import login_user
+import jwt
 from flask import (
     redirect,
-    request
+    request,
+    g,
+    flash,
+    session
 )
+
+TOKEN_PREFIX = "oauth_id_token_"
+REDIS_HOST = os.getenv("REDIS_HOST", "redis")
+REDIS_PORT = os.getenv("REDIS_PORT", 6379)
+redis_db = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+
+log = logging.getLogger(__name__)
 
 class CustomAuthOAuthView(AuthOAuthView):
 
+    @expose("/login/")
+    def login(self, provider="keycloak", register=None):
+        provider_obj = self.appbuilder.sm.oauth_remotes[provider]
+        base_url = os.environ.get("SUPERSET_PUBLIC_URL", request.url_root.strip('/'))
+        redirect_url = base_url + '/oauth-authorized/keycloak'
+
+        if not redirect_url:
+           redirect_url = request.url_root.strip('/') + self.appbuilder.get_url_for_login
+
+        login_base_url = provider_obj.api_base_url + "auth"
+
+        # Generate state and store in the session
+        #state = secrets.token_urlsafe(32)
+       # session['oauth_state'] = state  # Store state in the session
+
+        params = {
+            "client_id": provider_obj.client_id,
+            "redirect_uri": redirect_url,
+            "response_type": "code",
+            "scope": "openid profile email"
+        }
+        return redirect("{}?{}".format(login_base_url, urlencode(params)))
+
     @expose("/logout/")
     def logout(self, provider="keycloak", register=None):
+        user_id = str(g.user.id)
         provider_obj = self.appbuilder.sm.oauth_remotes[provider]
         redirect_url = request.url_root.strip('/') + self.appbuilder.get_url_for_login
-        url = ("logout?client_id={}&post_logout_redirect_uri={}".format(
-            provider_obj.client_id,
-            redirect_url
-        ))
+        logout_base_url = provider_obj.api_base_url + "logout"
+        params = {
+            "client_id": provider_obj.client_id,
+            "post_logout_redirect_uri": redirect_url
+        }
+        if redis_db.get(TOKEN_PREFIX + user_id):
+            params["id_token_hint"] = redis_db.get(TOKEN_PREFIX + user_id)
 
         ret = super().logout()
         time.sleep(1)
 
-        return redirect("{}{}".format(provider_obj.api_base_url, url))
+        return redirect("{}?{}".format(logout_base_url, urlencode(params)))
 
 
 class CustomSecurityManager(SupersetSecurityManager):
@@ -33,18 +75,24 @@ class CustomSecurityManager(SupersetSecurityManager):
     def oauth_user_info(self, provider, response=None):
         logging.debug("Oauth2 provider: {0}.".format(provider))
         if provider == 'keycloak':
-            # superset_roles: list[str] = ["Admin", "Alpha", "Gamma", "Public", "granter", "sql_lab"]
             me = self.appbuilder.sm.oauth_remotes[provider].get('userinfo').json()
-            roles = ["public", ]
-            if "roles" in me:
-                role_prefix = "superset-"
-                roles = [r[len(role_prefix):].lower() for r in me.get("roles", []) if r.startswith(role_prefix)]
-
             return {
                 "username": me.get("preferred_username", ""),
                 "first_name": me.get("given_name", ""),
                 "last_name": me.get("family_name", ""),
                 "email": me.get("email", ""),
-                "role_keys": roles,
+                'roles': me.get('roles', ['Public']),
+                'id_token': response["id_token"]
             }
         return {}
+
+    def auth_user_oauth(self, userinfo):
+        user = super(CustomSecurityManager, self).auth_user_oauth(userinfo)
+        logging.debug(f"User object after super call: {user}")
+        redis_db.set(TOKEN_PREFIX + str(user.id), userinfo["id_token"])
+        del userinfo["id_token"]
+        roles = [self.find_role(x) for x in userinfo['roles']]
+        roles = [x for x in roles if x is not None]
+        user.roles = roles
+        self.update_user(user)
+        return user
