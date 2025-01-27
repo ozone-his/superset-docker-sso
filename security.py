@@ -6,23 +6,18 @@ import os
 from six.moves.urllib.parse import urlencode
 import redis
 import time
-import secrets
-from flask_login import login_user
 import jwt
 from flask import (
     redirect,
     request,
     g,
     flash,
-    session
 )
 
 TOKEN_PREFIX = "oauth_id_token_"
 REDIS_HOST = os.getenv("REDIS_HOST", "redis")
 REDIS_PORT = os.getenv("REDIS_PORT", 6379)
 redis_db = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
-
-log = logging.getLogger(__name__)
 
 class CustomAuthOAuthView(AuthOAuthView):
 
