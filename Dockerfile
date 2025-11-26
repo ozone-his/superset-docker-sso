@@ -2,7 +2,7 @@ FROM apache/superset:4.0.1
 # Switching to root to install the required packages
 USER root
 
-RUN pip install authlib
+RUN pip install sqlalchemy-drill pydrill
 
 # Switching back to using the `superset` user
 USER superset
