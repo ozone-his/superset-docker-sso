@@ -16,3 +16,4 @@ ENV SUPERSET_CONFIG_PATH=/app/superset_config.py
 COPY ./superset-init.sh /app/
 COPY ./superset_config.py /app/
 COPY ./security.py /app/
+ENV PYTHONPATH=/app:$PYTHONPATH
