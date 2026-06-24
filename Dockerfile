@@ -8,7 +8,9 @@ RUN pip install --no-cache-dir \
     sqlalchemy-drill \
     pydrill \
     psycopg2-binary \
-    pymysql
+    pymysql \
+    openpyxl \
+    "xlrd>=2.0.1"
 
 # Switching back to using the `superset` user
 USER superset
