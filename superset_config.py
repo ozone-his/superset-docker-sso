@@ -6,10 +6,20 @@ from cachelib import RedisCache
 from cachelib.file import FileSystemCache
 logger = logging.getLogger()
 
-def password_from_env(url):
-    return os.getenv("ANALYTICS_DB_PASSWORD")
+#SQLALCHEMY_CUSTOM_PASSWORD_STORE = password_from_env
+def my_connection_mutator(uri, params, username, security_manager, source):
+    """
+    Intercept the connection right before execution.
+    Only override the password if the target database is 'analytics'.
+    """
+    if uri.database == "analytics":
+        env_pass = os.getenv("ANALYTICS_DB_PASSWORD")
+        if env_pass:
+            uri = uri.set(password=env_pass)
+            
+    return uri, params
 
-SQLALCHEMY_CUSTOM_PASSWORD_STORE = password_from_env
+DB_CONNECTION_MUTATOR = my_connection_mutator
 
 def get_env_variable(var_name, default=None):
     """Get the environment variable or raise exception."""
